@@ -3,7 +3,9 @@ import pandas
 import json
 
 
+
 def fixjson(badjson):
+    """Замена ковычек"""
     s = badjson
     idx = 0
     while True:
@@ -24,6 +26,7 @@ def fixjson(badjson):
 
 
 def as_json(maybejson):
+    """Если это json то вернем объект"""
     try:
         json_object = json.loads(maybejson)
         return True, json_object
@@ -56,37 +59,18 @@ class ImportClass:
                         "MERGE (P:PRODUCT {ProductID: $itemId})"
                         "MERGE (P)-[:RELAITED {Quantity: $count}]->(relatedItem)", itemId=product['id'], relaitedId=related['OtherSkuId'], count=related['Quantity'])
 
-    def create(self, product: dict):
-        with self.driver.session():
-            print(self.driver.session().write_transaction(self._create_nodes, product))
-    
-    @staticmethod
-    def _create_nodes(tx, product: dict):
-        try:
-            result = tx.run("MERGE (item:PRODUCT {ProductID: {$productId}}) "
-                            "SET item :ORIGINAL "
-                            "SET item.Category={$category} "
-                            "SET item.Views={$views} "
-                            "SET item.Sells=$sells ", productId=product['id'], category=product['category'], views=product['views'], sells=product['count'] )
-            if product["other_contracts"] != "":
-                for pr2 in product["other_contracts"]:
-                    tx.run("MERGE(relatedItem: PRODUCT {ProductID: $productId}) "
-                            "MERGE(item)-[:RELAITED {Quantity: &count}] -> (relatedItem))')", productId=pr2['OtherSkuId'], count=pr2['Quantity'])
-        except:
-            return False
-        return True
-
 
 graph = ImportClass("neo4j://185.117.152.68:7687", "******", "********")
 
-n_rows = 200000
-n_skip = 0
+n_rows = 200000 # Скок читаем
+n_skip = 0 #Скипаем на число из логов если упал сервер
+
 print("Read .csv file")
 csv_file = pandas.read_csv('parse.csv', delimiter=',', nrows=n_rows, skiprows=n_skip)
 print("Complite read")
 
 for id, row in enumerate(csv_file.iloc):
-    print("$n/$count", n=id+n_skip, count=n_rows)
+    print("%d/%d" % (id+n_skip+1, n_rows))
     row_id_CTE = int(row[0])
     row_name = row[1] if not pandas.isna(row[1]) else ""
     row_category = row[2] if not pandas.isna(row[2]) else ""
@@ -125,7 +109,6 @@ for id, row in enumerate(csv_file.iloc):
     else:
         row_price = ""
 
-
     product = {
         'id': row_id_CTE,
         'name': row_name,
@@ -144,6 +127,7 @@ for id, row in enumerate(csv_file.iloc):
         'price': row_price
     }
     graph.create_product(product)
+
 
 graph.close()
 
